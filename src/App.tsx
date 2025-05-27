@@ -1,16 +1,22 @@
-import { Viewer, Entity, PointGraphics } from "resium";
-import { Cartesian3, Color } from "cesium";
+// src/App.tsx
+import { useState } from "react";
+import ViewerPanel from "./components/ViewerPanel";
+import EditorPanel from "./components/EditorPanel";
+
+type CzmlPacket = Record<string, unknown>;
 
 function App() {
+  const [czml, setCzml] = useState<CzmlPacket[]>([]);
+
   return (
-    <Viewer full>
-      <Entity
-        name="Tokyo"
-        position={Cartesian3.fromDegrees(139.7670, 35.6814, 100)}
-      >
-        <PointGraphics pixelSize={10} color={Color.RED} />
-      </Entity>
-    </Viewer>
+    <div style={{ display: "flex", height: "100vh", width: "100vw" }}>
+      <div style={{ flex: 1 }}>
+        <ViewerPanel czml={czml} />
+      </div>
+      <div style={{ width: 400, borderLeft: "1px solid #ccc", backgroundColor: "#f8f8f8" }}>
+        <EditorPanel onUpdate={setCzml} />
+      </div>
+    </div>
   );
 }
 
