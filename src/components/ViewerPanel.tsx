@@ -1,7 +1,8 @@
 import { Viewer, CzmlDataSource } from "resium";
 import { Ion, CzmlDataSource as CzmlDS } from "cesium";
+const token = import.meta.env.VITE_CESIUM_TOKEN;
 
-Ion.defaultAccessToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI1YWYwNGQzOC1iYmRiLTQzZWEtOTJkMC1lNTEwZGI3MDlhZjUiLCJpZCI6MjM3MzMsImlhdCI6MTc0ODM1NDA4M30.uPrrBjl_bEZUpSsed0_iro7A6WqrjmpddJhJf0K_tGk";
+Ion.defaultAccessToken = token;
 
 interface Props {
   czml: Record<string, unknown>[];
