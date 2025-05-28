@@ -1,20 +1,28 @@
 // src/App.tsx
-import { useState } from "react";
+import { useState, useRef } from "react";
 import ViewerPanel from "./components/ViewerPanel";
 import EditorPanel from "./components/EditorPanel";
+import type { EditorPanelHandle } from "./components/EditorPanel";
 
 type CzmlPacket = Record<string, unknown>;
 
 function App() {
   const [czml, setCzml] = useState<CzmlPacket[]>([]);
 
+  // ✅ 正确声明 ref 类型
+  const editorRef = useRef<EditorPanelHandle>(null);
+
+  const handleCoordinateSelected = (coord: { lon: number; lat: number; height: number }) => {
+    editorRef.current?.handleCoordinateSelected(coord);
+  };
+
   return (
     <div style={{ display: "flex", height: "100vh", width: "100vw" }}>
       <div style={{ flex: 1 }}>
-        <ViewerPanel czml={czml} />
+        <ViewerPanel czml={czml} onCoordinateSelected={handleCoordinateSelected} />
       </div>
       <div style={{ width: 400, borderLeft: "1px solid #ccc", backgroundColor: "#f8f8f8" }}>
-        <EditorPanel onUpdate={setCzml} />
+        <EditorPanel onUpdate={setCzml} ref={editorRef} />
       </div>
     </div>
   );
