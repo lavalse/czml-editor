@@ -1,6 +1,6 @@
-import { Viewer, CzmlDataSource, Viewer as ResiumViewer } from "resium";
+import { Viewer, CzmlDataSource } from "resium";
 import { Ion, ScreenSpaceEventHandler, ScreenSpaceEventType, Cartesian2, Cartographic, Math as CesiumMath, Viewer as CesiumViewer } from "cesium";
-import { useEffect, useRef, useCallback } from "react";
+import { useRef, useCallback } from "react";
 
 const token = import.meta.env.VITE_CESIUM_TOKEN;
 Ion.defaultAccessToken = token;
