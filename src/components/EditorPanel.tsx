@@ -1,4 +1,4 @@
-import { useState, useEffect, forwardRef, useImperativeHandle } from "react";
+import { useState, useEffect, forwardRef, useImperativeHandle, useRef } from "react";
 import type { CzmlEntity } from "../commandSystem";
 import {
   handleCommandInput,
@@ -15,6 +15,8 @@ export interface EditorPanelHandle {
 }
 
 const EditorPanel = forwardRef<EditorPanelHandle, Props>(({ onUpdate }, ref) => {
+  const inputRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     registerBuiltinCommands();
   }, []);
@@ -29,6 +31,7 @@ const EditorPanel = forwardRef<EditorPanelHandle, Props>(({ onUpdate }, ref) => 
   const [interactiveStepIndex, setInteractiveStepIndex] = useState(0);
   const [interactiveParams, setInteractiveParams] = useState<Record<string, unknown>>({});
   const [prompt, setPrompt] = useState("请输入命令:");
+  const [commandInput, setCommandInput] = useState("");
 
   const completeCommand = (params: Record<string, unknown>) => {
     const czml = JSON.parse(text) as CzmlEntity[];
@@ -41,6 +44,7 @@ const EditorPanel = forwardRef<EditorPanelHandle, Props>(({ onUpdate }, ref) => 
     setInteractiveStepIndex(0);
     setInteractiveParams({});
     setPrompt("请输入命令:");
+    setCommandInput("");
   };
 
   const handleCommand = (input: string) => {
@@ -82,35 +86,11 @@ const EditorPanel = forwardRef<EditorPanelHandle, Props>(({ onUpdate }, ref) => 
     }
   };
 
-  // 提供地图点击注入参数的能力
   useImperativeHandle(ref, () => ({
-    handleCoordinateSelected: ({ lon, lat, height }) => {
-      console.log("📍 EditorPanel received coordinate:", { lon, lat, height });
-
-      if (!currentCommandName) return;
-      const command = getInteractiveCommand(currentCommandName);
-      if (!command) return;
-      const step = command.steps[interactiveStepIndex];
-
-     let value: number | undefined;
-
-      if (step.key === "lon") {
-        value = step.transform ? step.transform(String(lon)) as number : lon;
-      } else if (step.key === "lat") {
-        value = step.transform ? step.transform(String(lat)) as number : lat;
-      } else {
-        return; // 当前不是处理坐标的步骤，忽略点击
-      }
-
-      const updatedParams = { ...interactiveParams, [step.key]: value };
-      setInteractiveParams(updatedParams);
-
-      if (interactiveStepIndex + 1 < command.steps.length) {
-        setInteractiveStepIndex(interactiveStepIndex + 1);
-        setPrompt(command.steps[interactiveStepIndex + 1].prompt);
-      } else {
-        completeCommand(updatedParams);
-      }
+    handleCoordinateSelected: ({ lon, lat }) => {
+      const coordString = `${lon.toFixed(6)},${lat.toFixed(6)}`;
+      setCommandInput(coordString);
+      inputRef.current?.focus(); // ⬅ 保持输入框聚焦
     }
   }));
 
@@ -120,6 +100,16 @@ const EditorPanel = forwardRef<EditorPanelHandle, Props>(({ onUpdate }, ref) => 
 
       <p>{prompt}</p>
       <input
+        ref={inputRef}
+        value={commandInput}
+        onChange={(e) => setCommandInput(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            handleCommand(commandInput);
+            setCommandInput("");
+          }
+        }}
+        placeholder=""
         style={{
           width: "100%",
           padding: "8px",
@@ -129,12 +119,6 @@ const EditorPanel = forwardRef<EditorPanelHandle, Props>(({ onUpdate }, ref) => 
           color: "#0f0",
           border: "1px solid #444",
           borderRadius: "4px",
-        }}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") {
-            handleCommand((e.target as HTMLInputElement).value);
-            (e.target as HTMLInputElement).value = "";
-          }
         }}
       />
 

@@ -100,22 +100,30 @@ export function registerBuiltinCommands() {
     },
     interactive: {
       steps: [
-        { key: "lon", prompt: "\u8bf7\u8f93\u5165\u7ecf\u5ea6:", transform: parseFloat },
-        { key: "lat", prompt: "\u8bf7\u8f93\u5165\u7eac\u5ea6:", transform: parseFloat },
+        {
+          key: "coord",
+          prompt: "请输入坐标 (lon,lat)，或点击地图选择",
+          transform: (input: string | { lon: number; lat: number }) => {
+            if (typeof input === "string") {
+              const [lon, lat] = input.split(",").map(Number);
+              return { lon, lat };
+            }
+            return input; // 地图点击传入的对象
+          }
+        },
         { key: "height", prompt: "\u8bf7\u8f93\u5165\u9ad8\u5ea6 (\u53ef\u9009):", transform: (v) => parseFloat(v) || 0 },
         { key: "size", prompt: "\u8bf7\u8f93\u5165\u70b9\u5927\u5c0f (\u53ef\u9009):", transform: (v) => parseInt(v) || 10 },
       ],
       onComplete(params, czml) {
-        const { lon, lat, height = 0, size = 10 } = params as {
-          lon: number;
-          lat: number;
+        const { coord, height = 0, size = 10 } = params as {
+          coord: { lon: number; lat: number };
           height?: number;
           size?: number;
         };
 
         const newEntity: CzmlEntity = {
           id: `point-${Date.now()}`,
-          position: { cartographicDegrees: [lon, lat, height] },
+          position: { cartographicDegrees: [coord.lon, coord.lat, height] },
           point: {
             pixelSize: size,
             color: { rgba: [255, 0, 0, 255] },
