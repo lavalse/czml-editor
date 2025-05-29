@@ -1,10 +1,47 @@
+/* src/App.css */
 #root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
+  /* max-width: 1280px; */ /* Removed to allow full viewport width */
+  margin: 0; /* Removed default margin */
+  padding: 0; /* Removed default padding */
+  /* text-align: center; */ /* Removed, not needed for this layout */
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden; /* Prevent scrollbars on the root */
 }
 
+.app-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100%; /* Ensure it takes full width */
+}
+
+.main-content {
+  display: flex;
+  flex-grow: 1;
+  overflow: hidden; /* Prevents content from overflowing viewport */
+}
+
+/* Give EditorPanel and ViewerPanel some base size and allow them to grow/shrink */
+.main-content > div { /* Targeting the direct children divs */
+  /* flex: 1 1 50%; */ /* Commented out to respect specific widths like 400px for EditorPanel */
+  overflow: auto; /* Add scrollbars if content overflows the panel */
+}
+
+/* Specific styling for ViewerPanel's container to take remaining space */
+.main-content > div:first-child { /* Assuming ViewerPanel is the first child */
+  flex: 1;
+}
+
+/* Specific styling for EditorPanel's container */
+.main-content > div:last-child { /* Assuming EditorPanel is the second child */
+  width: 400px; /* As specified in App.tsx style */
+  border-left: 1px solid #ccc;
+  background-color: #f8f8f8;
+}
+
+
+/* Original logo and card styles - can be kept or removed if not used */
 .logo {
   height: 6em;
   padding: 1.5em;
