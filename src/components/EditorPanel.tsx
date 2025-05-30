@@ -1,10 +1,11 @@
 import { useState, useEffect, forwardRef, useImperativeHandle, useRef } from "react";
-import type { CzmlEntity } from "../commandSystem";
+import type { CzmlEntity } from "../commandSystem/types";
 import {
   handleCommandInput,
   getInteractiveCommand,
-  registerBuiltinCommands
-} from "../commandSystem";
+} from "../commandSystem/registry";
+
+import {registerBuiltinCommands} from "../commandSystem/registerBuiltins"
 
 interface Props {
   onUpdate: (czml: Record<string, unknown>[]) => void;
@@ -87,12 +88,18 @@ const EditorPanel = forwardRef<EditorPanelHandle, Props>(({ onUpdate }, ref) => 
   };
 
   useImperativeHandle(ref, () => ({
-    handleCoordinateSelected: ({ lon, lat }) => {
-      const coordString = `${lon.toFixed(6)},${lat.toFixed(6)}`;
-      setCommandInput(coordString);
-      inputRef.current?.focus(); // ⬅ 保持输入框聚焦
-    }
-  }));
+  handleCoordinateSelected: ({ lon, lat }) => {
+    const command = currentCommandName ? getInteractiveCommand(currentCommandName) : null;
+    if (!command) return;
+
+    const step = command.steps[interactiveStepIndex];
+    if (step.inputType !== "coordinate") return;
+
+    const coordString = `${lon.toFixed(6)},${lat.toFixed(6)}`;
+    setCommandInput(coordString);
+    inputRef.current?.focus();
+  }
+}));
 
   return (
     <div style={{ padding: "16px", height: "100%", boxSizing: "border-box" }}>

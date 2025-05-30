@@ -28,4 +28,5 @@ export interface InteractiveStep {
   prompt: string;
   transform?: (input: string) => unknown;
   validate?: (input: string) => boolean;
+  inputType?: string;
 }
