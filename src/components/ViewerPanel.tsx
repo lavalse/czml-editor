@@ -8,9 +8,10 @@ Ion.defaultAccessToken = token;
 interface Props {
   czml: Record<string, unknown>[];
   onCoordinateSelected?: (coords: { lon: number; lat: number; height: number }) => void;
+  onEntityPicked?: (id: string) => void;
 }
 
-const ViewerPanel = ({ czml, onCoordinateSelected }: Props) => {
+const ViewerPanel = ({ czml, onCoordinateSelected, onEntityPicked}: Props) => {
   const viewerRef = useRef<CesiumViewer | null>(null);
 
   const handleReady = useCallback((viewer: CesiumViewer) => {
@@ -23,22 +24,35 @@ const ViewerPanel = ({ czml, onCoordinateSelected }: Props) => {
 
     handler.setInputAction((event: { position: Cartesian2 }) => {
       const position = event.position;
-      const cartesian = viewer.camera.pickEllipsoid(position, viewer.scene.globe.ellipsoid);
-      if (cartesian) {
-        const cartographic = Cartographic.fromCartesian(cartesian);
-        const lon = CesiumMath.toDegrees(cartographic.longitude);
-        const lat = CesiumMath.toDegrees(cartographic.latitude);
-        const height = cartographic.height ?? 0;
 
-        console.log("👆 Map clicked at:", { lon, lat, height });
-        onCoordinateSelected({ lon, lat, height });
+      // ✅ 尝试拾取实体
+      const picked = viewer.scene.pick(position);
+      if (picked?.id && typeof picked.id.id === "string") {
+        const entityId = picked.id.id;
+        console.log("📍 Picked entity:", entityId);
+        onEntityPicked?.(entityId); // 🔥 通知外部
+        return;
+      }
+
+      // ✅ 若未点到实体，则尝试取地理坐标
+      if (onCoordinateSelected) {
+        const cartesian = viewer.camera.pickEllipsoid(position, viewer.scene.globe.ellipsoid);
+        if (cartesian) {
+          const cartographic = Cartographic.fromCartesian(cartesian);
+          const lon = CesiumMath.toDegrees(cartographic.longitude);
+          const lat = CesiumMath.toDegrees(cartographic.latitude);
+          const height = cartographic.height ?? 0;
+
+          console.log("👆 Map clicked at:", { lon, lat, height });
+          onCoordinateSelected({ lon, lat, height });
+        }
       }
     }, ScreenSpaceEventType.LEFT_CLICK);
 
     return () => {
       handler.destroy();
     };
-  }, [onCoordinateSelected]);
+  }, [onCoordinateSelected, onEntityPicked]);
 
   return (
     <Viewer

@@ -13,7 +13,10 @@ interface Props {
 
 export interface EditorPanelHandle {
   handleCoordinateSelected: (coord: { lon: number; lat: number; height: number }) => void;
+  handleEntityPicked(id: string): void;
 }
+
+
 
 const EditorPanel = forwardRef<EditorPanelHandle, Props>(({ onUpdate }, ref) => {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -87,16 +90,19 @@ const EditorPanel = forwardRef<EditorPanelHandle, Props>(({ onUpdate }, ref) => 
     }
   };
 
+  const currentCommand = currentCommandName ? getInteractiveCommand(currentCommandName) : null;
+  const currentStep = currentCommand?.steps[interactiveStepIndex] ?? null;
+
   useImperativeHandle(ref, () => ({
   handleCoordinateSelected: ({ lon, lat }) => {
-    const command = currentCommandName ? getInteractiveCommand(currentCommandName) : null;
-    if (!command) return;
-
-    const step = command.steps[interactiveStepIndex];
-    if (step.inputType !== "coordinate") return;
-
+    if (currentStep?.inputType !== "coordinate") return;
     const coordString = `${lon.toFixed(6)},${lat.toFixed(6)}`;
     setCommandInput(coordString);
+    inputRef.current?.focus();
+  },
+  handleEntityPicked: (id: string) => {
+    if (currentStep?.inputType !== "entityId") return;
+    setCommandInput(id);
     inputRef.current?.focus();
   }
 }));
