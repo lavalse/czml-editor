@@ -1,3 +1,4 @@
+// src/components/EditorPanel.tsx
 import { forwardRef, useImperativeHandle, useRef } from "react";
 import { useCommandRunner } from "../hooks/useCommandRunner";
 import CzmlEditor from "./CZMLEditor";
@@ -12,13 +13,13 @@ export interface EditorPanelHandle {
   handleEntityPicked(id: string): void;
   finalizeCoordinatesStep(): void;
   getInteractiveCoords: () => { lon: number; lat: number }[];
-  // 🔧 添加缺失的方法定义
   getCurrentInputType: () => string | null;
 }
 
 const EditorPanel = forwardRef<EditorPanelHandle, Props>(({ onUpdate }, ref) => {
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // 使用重构后的 hook
   const {
     czmlText,
     setCzmlText,
@@ -27,19 +28,19 @@ const EditorPanel = forwardRef<EditorPanelHandle, Props>(({ onUpdate }, ref) => 
     setCommandInput,
     handleCommand,
     handleCoordinateSelected,
-    finalizeCoordinatesStep,
     handleEntityPicked,
+    finalizeCoordinatesStep,
     interactiveCoords,
     error,
-    currentInputType, // 🔧 确保从 hook 中获取这个值
+    currentInputType,
   } = useCommandRunner({ onUpdate, inputRef });
 
+  // 暴露方法给父组件
   useImperativeHandle(ref, () => ({
     handleCoordinateSelected,
     handleEntityPicked,
     finalizeCoordinatesStep,
     getInteractiveCoords: () => interactiveCoords,
-    // 🔧 实现 getCurrentInputType 方法
     getCurrentInputType: () => currentInputType,
   }));
 
@@ -49,6 +50,7 @@ const EditorPanel = forwardRef<EditorPanelHandle, Props>(({ onUpdate }, ref) => 
       style={{ padding: "16px", height: "100%", boxSizing: "border-box" }}
     >
       <h3>CZML 编辑器</h3>
+      
       <CommandInput
         prompt={prompt}
         inputRef={inputRef}
@@ -56,6 +58,7 @@ const EditorPanel = forwardRef<EditorPanelHandle, Props>(({ onUpdate }, ref) => 
         onChange={setCommandInput}
         onEnter={() => handleCommand(commandInput)}
       />
+      
       {error && (
         <div
           style={{
@@ -70,6 +73,7 @@ const EditorPanel = forwardRef<EditorPanelHandle, Props>(({ onUpdate }, ref) => 
           ⚠️ {error}
         </div>
       )}
+      
       <CzmlEditor value={czmlText} onChange={setCzmlText} />
     </div>
   );

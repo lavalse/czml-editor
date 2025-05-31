@@ -1,15 +1,15 @@
+// src/components/ViewerPanel.tsx
 import { Viewer, CzmlDataSource } from "resium";
 import { Ion, ScreenSpaceEventHandler, ScreenSpaceEventType, Cartesian2, Cartographic, Math as CesiumMath, Viewer as CesiumViewer } from "cesium";
-import { useRef, useCallback } from "react";
+import { useRef, useCallback, useEffect } from "react";
 import { Entity, PolylineGraphics, PointGraphics } from "resium";
 import { Cartesian3, Color } from "cesium";
-import { useCzmlStore } from "../stores/useCZMLStore"; 
+import { useCzmlStore } from "../stores/useCzmlStore"; 
 
 const token = import.meta.env.VITE_CESIUM_TOKEN;
 Ion.defaultAccessToken = token;
 
 interface Props {
-  // 🎯 移除 czml prop，其他保持不变
   onCoordinateSelected?: (coords: { lon: number; lat: number; height: number }) => void;
   onEntityPicked?: (id: string) => void;
   onFinishCoordinateInput?: () => void;
@@ -25,39 +25,44 @@ const ViewerPanel = ({
   currentInputType 
 }: Props) => {
   const viewerRef = useRef<CesiumViewer | null>(null);
+  const handlerRef = useRef<ScreenSpaceEventHandler | null>(null);
   
-  // 🎯 从 store 获取 CZML 数据，而不是从 props
   const czml = useCzmlStore((state) => state.czml);
 
-  const handleReady = useCallback((viewer: CesiumViewer) => {
-    viewerRef.current = viewer;
-
-    if (!viewer || !onCoordinateSelected) return;
+  // 🔧 将点击处理逻辑分离，避免重复绑定
+  const setupEventHandlers = useCallback((viewer: CesiumViewer) => {
+    // 清理旧的事件处理器
+    if (handlerRef.current) {
+      handlerRef.current.destroy();
+    }
 
     const handler = new ScreenSpaceEventHandler(viewer.scene.canvas);
-    console.log("📡 Click handler attached");
+    handlerRef.current = handler;
+
+    console.log("📡 设置点击事件处理器");
 
     handler.setInputAction((event: { position: Cartesian2 }) => {
       const position = event.position;
+      console.log("🖱️ 检测到点击事件");
 
+      // 先检查是否点击了实体
       const picked = viewer.scene.pick(position);
       if (picked?.id && typeof picked.id.id === "string") {
         const entityId = picked.id.id;
-        console.log("📍 Picked entity:", entityId);
+        console.log("📍 选中实体:", entityId);
         onEntityPicked?.(entityId);
         
         if (currentInputType === "entityId") {
           setTimeout(() => {
             const input = document.querySelector('input[data-command-input="true"]') as HTMLInputElement;
-            if (input) {
-              input.focus();
-            }
+            if (input) input.focus();
           }, 100);
         }
-        return;
+        return; // 重要：选中实体后直接返回，不处理坐标
       }
 
-      if (onCoordinateSelected) {
+      // 只有在需要坐标输入时才处理地图点击
+      if (onCoordinateSelected && (currentInputType === "coordinate" || currentInputType === "coordinates[]")) {
         const cartesian = viewer.camera.pickEllipsoid(position, viewer.scene.globe.ellipsoid);
         if (cartesian) {
           const cartographic = Cartographic.fromCartesian(cartesian);
@@ -65,15 +70,13 @@ const ViewerPanel = ({
           const lat = CesiumMath.toDegrees(cartographic.latitude);
           const height = cartographic.height ?? 0;
 
-          console.log("👆 Map clicked at:", { lon, lat, height });
+          console.log("👆 地图点击坐标:", { lon, lat, height });
           onCoordinateSelected({ lon, lat, height });
           
           if (currentInputType === "coordinate") {
             setTimeout(() => {
               const input = document.querySelector('input[data-command-input="true"]') as HTMLInputElement;
-              if (input) {
-                input.focus();
-              }
+              if (input) input.focus();
             }, 100);
           }
         }
@@ -81,21 +84,38 @@ const ViewerPanel = ({
     }, ScreenSpaceEventType.LEFT_CLICK);
 
     handler.setInputAction(() => {
-      console.log("✅ Right-click: finish coordinate input");
+      console.log("✅ 右键点击：完成坐标输入");
       onFinishCoordinateInput?.();
       
       setTimeout(() => {
         const input = document.querySelector('input[data-command-input="true"]') as HTMLInputElement;
-        if (input) {
-          input.focus();
-        }
+        if (input) input.focus();
       }, 100);
     }, ScreenSpaceEventType.RIGHT_CLICK);
 
-    return () => {
-      handler.destroy();
-    };
   }, [onCoordinateSelected, onEntityPicked, onFinishCoordinateInput, currentInputType]);
+
+  const handleReady = useCallback((viewer: CesiumViewer) => {
+    console.log("🌍 Cesium Viewer 准备就绪");
+    viewerRef.current = viewer;
+    setupEventHandlers(viewer);
+  }, [setupEventHandlers]);
+
+  // 🔧 当 currentInputType 改变时重新设置事件处理器
+  useEffect(() => {
+    if (viewerRef.current) {
+      setupEventHandlers(viewerRef.current);
+    }
+  }, [setupEventHandlers]);
+
+  // 🔧 组件卸载时清理事件处理器
+  useEffect(() => {
+    return () => {
+      if (handlerRef.current) {
+        handlerRef.current.destroy();
+      }
+    };
+  }, []);
 
   return (
     <Viewer
@@ -104,7 +124,6 @@ const ViewerPanel = ({
         if (e?.cesiumElement) handleReady(e.cesiumElement);
       }}
     >
-      {/* 🎯 使用来自 store 的 czml 数据 */}
       <CzmlDataSource data={czml} key={JSON.stringify(czml)} />
 
       {interactiveCoords && interactiveCoords.length > 0 && (
