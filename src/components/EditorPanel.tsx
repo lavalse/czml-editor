@@ -1,5 +1,5 @@
 // src/components/EditorPanel.tsx
-import { forwardRef, useImperativeHandle, useRef } from "react";
+import { useRef } from "react";
 import { useCommandRunner } from "../hooks/useCommandRunner";
 import CzmlEditor from "./CZMLEditor";
 import CommandInput from "../components/CommandInput";
@@ -8,18 +8,10 @@ interface Props {
   onUpdate: (czml: Record<string, unknown>[]) => void;
 }
 
-export interface EditorPanelHandle {
-  handleCoordinateSelected: (coord: { lon: number; lat: number; height: number }) => void;
-  handleEntityPicked(id: string): void;
-  finalizeCoordinatesStep(): void;
-  getInteractiveCoords: () => { lon: number; lat: number }[];
-  getCurrentInputType: () => string | null;
-}
-
-const EditorPanel = forwardRef<EditorPanelHandle, Props>(({ onUpdate }, ref) => {
+// 🔧 移除复杂的 forwardRef 和 useImperativeHandle
+const EditorPanel = ({ onUpdate }: Props) => {
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // 使用重构后的 hook
   const {
     czmlText,
     setCzmlText,
@@ -27,22 +19,8 @@ const EditorPanel = forwardRef<EditorPanelHandle, Props>(({ onUpdate }, ref) => 
     commandInput,
     setCommandInput,
     handleCommand,
-    handleCoordinateSelected,
-    handleEntityPicked,
-    finalizeCoordinatesStep,
-    interactiveCoords,
     error,
-    currentInputType,
   } = useCommandRunner({ onUpdate, inputRef });
-
-  // 暴露方法给父组件
-  useImperativeHandle(ref, () => ({
-    handleCoordinateSelected,
-    handleEntityPicked,
-    finalizeCoordinatesStep,
-    getInteractiveCoords: () => interactiveCoords,
-    getCurrentInputType: () => currentInputType,
-  }));
 
   return (
     <div 
@@ -77,6 +55,6 @@ const EditorPanel = forwardRef<EditorPanelHandle, Props>(({ onUpdate }, ref) => 
       <CzmlEditor value={czmlText} onChange={setCzmlText} />
     </div>
   );
-});
+};
 
 export default EditorPanel;

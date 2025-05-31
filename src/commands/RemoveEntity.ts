@@ -9,8 +9,13 @@ const RemoveEntity: CommandDef = {
       {
         key: "id",
         prompt: "请输入要删除的实体ID，或点击地图上的实体：",
-        transform: (input: string) => input.trim(),
-        inputType: "entityId"
+        inputType: "entityId",
+        transform: (input) => {
+          if (typeof input === "string") {
+            return input.trim();
+          }
+          return String(input).trim();
+        },
       }
     ],
 

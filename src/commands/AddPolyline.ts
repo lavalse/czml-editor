@@ -1,9 +1,8 @@
 // src/commands/AddPolyline.ts
-import type { CommandDef, CzmlEntity } from "../commandSystem/types";
+import type { CommandDef, CzmlEntity, CommandInputValue } from "../commandSystem/types";
 
-function transformCoordinatesInput(
-  input: string | { lon: number; lat: number } | { lon: number; lat: number }[]
-): number[] {
+// 🔧 改进的类型守卫函数
+function transformCoordinatesInput(input: CommandInputValue): number[] {
   if (typeof input === "string") {
     // 字符串情况: 例如 "130,30 135,35"
     const parts = input.trim().split(/\s+/); // 空格分割
@@ -18,10 +17,13 @@ function transformCoordinatesInput(
     return input.flatMap(p => [p.lon, p.lat, 0]);
   }
 
-  // 单点点击地图的情况
-  return [input.lon, input.lat, 0];
-}
+  if (typeof input === "object" && input !== null) {
+    // 单点点击地图的情况
+    return [input.lon, input.lat, 0];
+  }
 
+  throw new Error("无效的坐标输入");
+}
 
 const AddPolyline: CommandDef = {
   name: "AddPolyline",
@@ -71,18 +73,18 @@ const AddPolyline: CommandDef = {
       {
         key: "coords",
         prompt: "请点击地图输入多个点，完成后按完成按钮",
-        inputType: "coordinates[]", // 你需要支持 coordinates[] 类型的交互输入
-        transform: transformCoordinatesInput // 默认高度为 0
+        inputType: "coordinates[]",
+        transform: transformCoordinatesInput
       },
       {
         key: "width",
         prompt: "请输入线宽（可选）：",
-        transform: v => {
-          if (typeof v === "string") {
-            const parsed = parseFloat(v);
+        transform: (input) => {
+          if (typeof input === "string") {
+            const parsed = parseFloat(input);
             return isNaN(parsed) ? 3 : parsed;
           }
-          return 3; // 如果用户通过地图交互给了对象，也返回默认值
+          return 3;
         }
       },
     ],
