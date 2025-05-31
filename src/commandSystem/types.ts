@@ -10,6 +10,12 @@ export interface CommandInstance {
   params: Record<string, unknown>;
 }
 
+// 🔧 更具体的输入类型定义
+export type CommandInputValue = 
+  | string 
+  | { lon: number; lat: number } 
+  | { lon: number; lat: number }[];
+
 export interface CommandDef {
   name: string;
   category?: string;
@@ -23,10 +29,11 @@ export interface InteractiveCommandDef {
   onComplete: (params: Record<string, unknown>, czml: CzmlEntity[]) => CzmlEntity[];
 }
 
+// 🔧 简化的步骤定义，使用联合类型而不是泛型
 export interface InteractiveStep {
   key: string;
   prompt: string;
-  transform?: (input: string | { lon: number; lat: number } | { lon: number; lat: number }[]) => unknown;
+  transform?: (input: CommandInputValue) => unknown;
   validate?: (input: string) => boolean;
-  inputType?: "coordinate" | "entityId" | "coordinates[]" ;
+  inputType?: "coordinate" | "entityId" | "coordinates[]";
 }

@@ -1,5 +1,6 @@
 // src/components/CommandInput.tsx
 import type { RefObject } from "react";
+import { useEffect } from "react";
 
 interface Props {
   prompt: string;
@@ -10,11 +11,17 @@ interface Props {
 }
 
 const CommandInput = ({ prompt, value, onChange, onEnter, inputRef }: Props) => {
+  // 🔧 确保组件挂载后输入框可被找到
+  useEffect(() => {
+    console.log("📝 CommandInput 组件已挂载/更新");
+  }, []);
+
   return (
     <>
       <p>{prompt}</p>
       <input
         ref={inputRef}
+        data-command-input="true"  // 🔧 添加这个属性
         value={value}
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={(e) => {

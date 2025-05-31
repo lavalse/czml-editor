@@ -1,172 +1,148 @@
-// hooks/useCommandRunner.ts
-import { useState, useEffect, useCallback } from "react";
+// src/hooks/useCommandRunner.ts
+import { useEffect, useCallback } from "react";
 import { handleCommandInput, getInteractiveCommand } from "../commandSystem/registry";
 import { registerBuiltinCommands } from "../commandSystem/registerBuiltins";
 import type { CzmlEntity } from "../commandSystem/types";
 import { safeParseCzml } from "../utils/json";
-import { useCzmlStore } from "../stores/useCZMLStore";
+import { useCzmlStore } from "../stores/useCzmlStore";
+import { useCommandStore, selectIsWaitingForInput } from "../stores/useCommandStore";
 
 interface Options {
   onUpdate: (czml: Record<string, unknown>[]) => void;
-  initialText?: string;
   inputRef?: React.RefObject<HTMLInputElement | null>;
 }
 
-export const useCommandRunner = ({ onUpdate, initialText, inputRef }: Options) => {
-  // 🔧 修复：分别获取数据和方法，避免无限循环
+// 🔧 更健壮的focus工具函数，带重试机制
+const focusCommandInput = (delay = 100, maxRetries = 3) => {
+  let retryCount = 0;
+  
+  const tryFocus = () => {
+    const input = document.querySelector('input[data-command-input="true"]') as HTMLInputElement;
+    if (input) {
+      input.focus();
+      console.log("🎯 Hook聚焦输入框成功");
+      return true;
+    } else {
+      retryCount++;
+      if (retryCount < maxRetries) {
+        console.log(`🔄 Hook重试聚焦 (${retryCount}/${maxRetries})`);
+        setTimeout(tryFocus, 50); // 短间隔重试
+      } else {
+        console.warn("⚠️ Hook聚焦失败：未找到命令输入框");
+      }
+      return false;
+    }
+  };
+  
+  setTimeout(tryFocus, delay);
+};
+
+export const useCommandRunner = ({ onUpdate, inputRef }: Options) => {
+  // CZML Store
   const czml = useCzmlStore((state) => state.czml);
   const czmlText = useCzmlStore((state) => state.czmlText);
   const setCzml = useCzmlStore((state) => state.setCzml);
   const setCzmlText = useCzmlStore((state) => state.setCzmlText);
 
-  // 其他状态保持不变
-  const [currentCommandName, setCurrentCommandName] = useState<string | null>(null);
-  const [interactiveStepIndex, setInteractiveStepIndex] = useState(0);
-  const [interactiveParams, setInteractiveParams] = useState<Record<string, unknown>>({});
-  const [prompt, setPrompt] = useState("请输入命令:");
-  const [commandInput, setCommandInput] = useState("");
-  const [interactiveCoords, setInteractiveCoords] = useState<{ lon: number; lat: number }[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  // Command Store - 🔧 只获取需要的状态
+  const {
+    prompt,
+    commandInput,
+    error,
+    setCommandInput,
+    setError,
+    startInteractiveCommand,
+    nextStep,
+    resetCommand,
+  } = useCommandStore();
 
+  const isWaitingForInput = useCommandStore(selectIsWaitingForInput);
+
+  // 初始化命令系统
   useEffect(() => {
     registerBuiltinCommands();
   }, []);
 
-  // 🔧 修复：使用 useEffect 但添加依赖控制，避免无限循环
+  // 通知父组件更新
   useEffect(() => {
     onUpdate(czml);
-  }, [czml]); // 移除 onUpdate 依赖，因为它可能每次都变
+  }, [czml]);
 
-  const getCurrentInputType = useCallback(() => {
-    if (!currentCommandName) return null;
-    const command = getInteractiveCommand(currentCommandName);
-    if (!command) return null;
-    const step = command.steps[interactiveStepIndex];
-    return step?.inputType || null;
-  }, [currentCommandName, interactiveStepIndex]);
-
-  const maintainInputFocus = useCallback(() => {
-    const currentInputType = getCurrentInputType();
-    if (currentInputType === "coordinate" || currentInputType === "entityId") {
-      setTimeout(() => {
-        if (inputRef?.current) {
-          inputRef.current.focus();
-        }
-      }, 100);
-    }
-  }, [getCurrentInputType, inputRef]);
-
-  const completeCommand = useCallback((params: Record<string, unknown>) => {
-    const command = getInteractiveCommand(currentCommandName!);
+  // 🔧 简化的完成命令逻辑
+  const completeCommand = useCallback(() => {
+    const state = useCommandStore.getState();
+    if (!state.currentCommandName) return;
+    
+    const command = getInteractiveCommand(state.currentCommandName);
     if (!command) return;
     
-    const newCzml = command.onComplete(params, czml);
-    setCzml(newCzml); // 🔧 这里只调用一次，不会造成循环
-
-    setCurrentCommandName(null);
-    setInteractiveCoords([]);
-    setInteractiveStepIndex(0);
-    setInteractiveParams({});
-    setPrompt("请输入命令:");
-    setCommandInput("");
+    const newCzml = command.onComplete(state.interactiveParams, czml);
+    setCzml(newCzml);
+    resetCommand();
     
-    setTimeout(() => {
-      if (inputRef?.current) {
-        inputRef.current.focus();
-      }
-    }, 100);
-  }, [currentCommandName, czml, setCzml, inputRef]);
+    // 🔧 使用统一的focus函数
+    focusCommandInput(150);
+  }, [czml, setCzml, resetCommand]);
 
+  // 🔧 简化的命令处理逻辑
   const handleCommand = useCallback((input: string) => {
     try {
+      if (error) {
+        setError(null);
+      }
+
       const parsedCzml = safeParseCzml(czmlText) as CzmlEntity[];
-
-      if (!currentCommandName) {
-        const interactive = getInteractiveCommand(input);
-        if (interactive) {
-          setCurrentCommandName(input);
-          setInteractiveStepIndex(0);
-          setInteractiveParams({});
-          setPrompt(interactive.steps[0].prompt);
-          setInteractiveCoords([]);
-          return;
-        }
-
-        const newCzml = handleCommandInput(input, parsedCzml);
-        setCzml(newCzml); // 🔧 这里只调用一次
+      if (!parsedCzml) {
+        setError("当前 CZML 内容格式不正确，无法执行命令");
         return;
       }
 
-      const command = getInteractiveCommand(currentCommandName);
-      if (!command) return;
+      if (!isWaitingForInput) {
+        // 新命令
+        const interactive = getInteractiveCommand(input);
+        if (interactive) {
+          startInteractiveCommand(input);
+          // 🔧 开始交互命令后聚焦
+          focusCommandInput(100);
+          return;
+        }
 
-      const step = command.steps[interactiveStepIndex];
-      const value = step.transform ? step.transform(input) : input;
-      const updatedParams = { ...interactiveParams, [step.key]: value };
-      setInteractiveParams(updatedParams);
+        // 非交互式命令
+        const newCzml = handleCommandInput(input, parsedCzml);
+        setCzml(newCzml);
+        return;
+      }
 
-      if (interactiveStepIndex + 1 < command.steps.length) {
-        setInteractiveStepIndex(interactiveStepIndex + 1);
-        setPrompt(command.steps[interactiveStepIndex + 1].prompt);
+      // 交互式命令的下一步
+      const hasNextStep = nextStep(input);
+      if (!hasNextStep) {
+        completeCommand();
       } else {
-        completeCommand(updatedParams);
+        // 🔧 进入下一步后聚焦
+        focusCommandInput(100);
       }
-    } catch {
-      setError("当前 CZML 内容格式不正确，无法执行命令");
+    } catch (err) {
+      setError("命令执行出错: " + (err instanceof Error ? err.message : String(err)));
     }
-  }, [czmlText, currentCommandName, interactiveStepIndex, interactiveParams, setCzml, completeCommand]);
-
-  const getCurrentStep = useCallback(() => {
-    const command = getInteractiveCommand(currentCommandName!);
-    return command?.steps[interactiveStepIndex] ?? null;
-  }, [currentCommandName, interactiveStepIndex]);
-
-  const isCurrentStepInputType = useCallback((type: string) => {
-    const step = getCurrentStep();
-    return step?.inputType === type;
-  }, [getCurrentStep]);
-
-  const handleCoordinateSelected = useCallback(({ lon, lat }: { lon: number; lat: number }) => {
-    if (isCurrentStepInputType("coordinates[]")) {
-      setInteractiveCoords(prev => [...prev, { lon, lat }]);
-    } else if (isCurrentStepInputType("coordinate")) {
-      const coordStr = `${lon.toFixed(6)},${lat.toFixed(6)}`;
-      setCommandInput(coordStr);
-      setInteractiveCoords([{ lon, lat }]);
-      maintainInputFocus();
-    }
-  }, [isCurrentStepInputType, maintainInputFocus]);
-
-  const handleEntityPicked = useCallback((id: string) => {
-    if (!isCurrentStepInputType("entityId")) return;
-    setCommandInput(id);
-    maintainInputFocus();
-  }, [isCurrentStepInputType, maintainInputFocus]);
-
-  const finalizeCoordinatesStep = useCallback(() => {
-    if (!isCurrentStepInputType("coordinates[]")) return;
-
-    const coordStr = interactiveCoords.map(p => `${p.lon.toFixed(6)},${p.lat.toFixed(6)}`).join(" ");
-    setCommandInput(coordStr);
-    setTimeout(() => {
-      if (inputRef?.current) {
-        inputRef.current.focus();
-      }
-    }, 100);
-  }, [isCurrentStepInputType, interactiveCoords, inputRef]);
+  }, [
+    error, 
+    setError, 
+    czmlText, 
+    isWaitingForInput, 
+    startInteractiveCommand, 
+    setCzml, 
+    nextStep, 
+    completeCommand
+  ]);
 
   return {
+    // 🔧 只返回必要的状态和方法
     czmlText,
     setCzmlText,
     prompt,
     commandInput,
     setCommandInput,
     handleCommand,
-    handleCoordinateSelected,
-    interactiveCoords,
-    finalizeCoordinatesStep,
-    handleEntityPicked,
     error,
-    currentInputType: getCurrentInputType()
   };
 };
