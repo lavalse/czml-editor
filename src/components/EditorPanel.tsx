@@ -12,6 +12,8 @@ export interface EditorPanelHandle {
   handleEntityPicked(id: string): void;
   finalizeCoordinatesStep(): void;
   getInteractiveCoords: () => { lon: number; lat: number }[];
+  // 🔧 添加缺失的方法定义
+  getCurrentInputType: () => string | null;
 }
 
 const EditorPanel = forwardRef<EditorPanelHandle, Props>(({ onUpdate }, ref) => {
@@ -29,17 +31,23 @@ const EditorPanel = forwardRef<EditorPanelHandle, Props>(({ onUpdate }, ref) => 
     handleEntityPicked,
     interactiveCoords,
     error,
-  } = useCommandRunner({ onUpdate,inputRef });
+    currentInputType, // 🔧 确保从 hook 中获取这个值
+  } = useCommandRunner({ onUpdate, inputRef });
 
   useImperativeHandle(ref, () => ({
     handleCoordinateSelected,
     handleEntityPicked,
     finalizeCoordinatesStep,
     getInteractiveCoords: () => interactiveCoords,
+    // 🔧 实现 getCurrentInputType 方法
+    getCurrentInputType: () => currentInputType,
   }));
 
   return (
-    <div style={{ padding: "16px", height: "100%", boxSizing: "border-box" }}>
+    <div 
+      className="editor-panel"
+      style={{ padding: "16px", height: "100%", boxSizing: "border-box" }}
+    >
       <h3>CZML 编辑器</h3>
       <CommandInput
         prompt={prompt}
@@ -61,7 +69,7 @@ const EditorPanel = forwardRef<EditorPanelHandle, Props>(({ onUpdate }, ref) => 
         >
           ⚠️ {error}
         </div>
-        )}
+      )}
       <CzmlEditor value={czmlText} onChange={setCzmlText} />
     </div>
   );

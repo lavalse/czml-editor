@@ -3,21 +3,31 @@ import { Ion, ScreenSpaceEventHandler, ScreenSpaceEventType, Cartesian2, Cartogr
 import { useRef, useCallback } from "react";
 import { Entity, PolylineGraphics, PointGraphics } from "resium";
 import { Cartesian3, Color } from "cesium";
-
+import { useCzmlStore } from "../stores/useCZMLStore"; 
 
 const token = import.meta.env.VITE_CESIUM_TOKEN;
 Ion.defaultAccessToken = token;
 
 interface Props {
-  czml: Record<string, unknown>[];
+  // 🎯 移除 czml prop，其他保持不变
   onCoordinateSelected?: (coords: { lon: number; lat: number; height: number }) => void;
   onEntityPicked?: (id: string) => void;
   onFinishCoordinateInput?: () => void;
   interactiveCoords?: { lon: number; lat: number }[];
+  currentInputType?: "coordinate" | "entityId" | "coordinates[]" | null;
 }
 
-const ViewerPanel = ({ czml, onCoordinateSelected, onEntityPicked, onFinishCoordinateInput,interactiveCoords }: Props) => {
+const ViewerPanel = ({ 
+  onCoordinateSelected, 
+  onEntityPicked, 
+  onFinishCoordinateInput,
+  interactiveCoords,
+  currentInputType 
+}: Props) => {
   const viewerRef = useRef<CesiumViewer | null>(null);
+  
+  // 🎯 从 store 获取 CZML 数据，而不是从 props
+  const czml = useCzmlStore((state) => state.czml);
 
   const handleReady = useCallback((viewer: CesiumViewer) => {
     viewerRef.current = viewer;
@@ -35,6 +45,15 @@ const ViewerPanel = ({ czml, onCoordinateSelected, onEntityPicked, onFinishCoord
         const entityId = picked.id.id;
         console.log("📍 Picked entity:", entityId);
         onEntityPicked?.(entityId);
+        
+        if (currentInputType === "entityId") {
+          setTimeout(() => {
+            const input = document.querySelector('input[data-command-input="true"]') as HTMLInputElement;
+            if (input) {
+              input.focus();
+            }
+          }, 100);
+        }
         return;
       }
 
@@ -48,6 +67,15 @@ const ViewerPanel = ({ czml, onCoordinateSelected, onEntityPicked, onFinishCoord
 
           console.log("👆 Map clicked at:", { lon, lat, height });
           onCoordinateSelected({ lon, lat, height });
+          
+          if (currentInputType === "coordinate") {
+            setTimeout(() => {
+              const input = document.querySelector('input[data-command-input="true"]') as HTMLInputElement;
+              if (input) {
+                input.focus();
+              }
+            }, 100);
+          }
         }
       }
     }, ScreenSpaceEventType.LEFT_CLICK);
@@ -55,52 +83,56 @@ const ViewerPanel = ({ czml, onCoordinateSelected, onEntityPicked, onFinishCoord
     handler.setInputAction(() => {
       console.log("✅ Right-click: finish coordinate input");
       onFinishCoordinateInput?.();
+      
+      setTimeout(() => {
+        const input = document.querySelector('input[data-command-input="true"]') as HTMLInputElement;
+        if (input) {
+          input.focus();
+        }
+      }, 100);
     }, ScreenSpaceEventType.RIGHT_CLICK);
 
     return () => {
       handler.destroy();
     };
-  }, [onCoordinateSelected, onEntityPicked, onFinishCoordinateInput]);
+  }, [onCoordinateSelected, onEntityPicked, onFinishCoordinateInput, currentInputType]);
 
   return (
     <Viewer
-  style={{ width: "100%", height: "100%" }}
-  ref={(e) => {
-    if (e?.cesiumElement) handleReady(e.cesiumElement);
-  }}
->
-  <CzmlDataSource data={czml} key={JSON.stringify(czml)} />
+      style={{ width: "100%", height: "100%" }}
+      ref={(e) => {
+        if (e?.cesiumElement) handleReady(e.cesiumElement);
+      }}
+    >
+      {/* 🎯 使用来自 store 的 czml 数据 */}
+      <CzmlDataSource data={czml} key={JSON.stringify(czml)} />
 
-  {/* ✅ 临时交互点和线 */}
-  {interactiveCoords && interactiveCoords.length > 0 && (
-    <>
-      {/* 每个点显示为黄色小点 */}
-      {interactiveCoords.map((coord, i) => (
-        <Entity
-          key={`temp-point-${i}`}
-          position={Cartesian3.fromDegrees(coord.lon, coord.lat, 0)}
-        >
-          <PointGraphics pixelSize={8} color={Color.YELLOW} />
-        </Entity>
-      ))}
+      {interactiveCoords && interactiveCoords.length > 0 && (
+        <>
+          {interactiveCoords.map((coord, i) => (
+            <Entity
+              key={`temp-point-${i}`}
+              position={Cartesian3.fromDegrees(coord.lon, coord.lat, 0)}
+            >
+              <PointGraphics pixelSize={8} color={Color.YELLOW} />
+            </Entity>
+          ))}
 
-      {/* 两个以上点才显示临时 polyline */}
-      {interactiveCoords.length >= 2 && (
-        <Entity>
-          <PolylineGraphics
-            positions={interactiveCoords.map(p =>
-              Cartesian3.fromDegrees(p.lon, p.lat, 0)
-            )}
-            width={2}
-            material={Color.YELLOW}
-            clampToGround={true}
-          />
-        </Entity>
+          {interactiveCoords.length >= 2 && (
+            <Entity>
+              <PolylineGraphics
+                positions={interactiveCoords.map(p =>
+                  Cartesian3.fromDegrees(p.lon, p.lat, 0)
+                )}
+                width={2}
+                material={Color.YELLOW}
+                clampToGround={true}
+              />
+            </Entity>
+          )}
+        </>
       )}
-    </>
-  )}
-</Viewer>
-
+    </Viewer>
   );
 };
 

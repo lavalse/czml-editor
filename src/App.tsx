@@ -4,23 +4,24 @@ import ViewerPanel from "./components/ViewerPanel";
 import EditorPanel from "./components/EditorPanel";
 import type { EditorPanelHandle } from "./components/EditorPanel";
 
-type CzmlPacket = Record<string, unknown>;
-
 function App() {
-  const [czml, setCzml] = useState<CzmlPacket[]>([]);
   const editorRef = useRef<EditorPanelHandle>(null);
-
-  // ✅ 添加 interactiveCoords 的 state
   const [interactiveCoords, setInteractiveCoords] = useState<{ lon: number; lat: number }[]>([]);
+  const [currentInputType, setCurrentInputType] = useState<"coordinate" | "entityId" | "coordinates[]" | null>(null);
 
-  // ✅ 定时同步 editorRef 中的交互坐标
   useEffect(() => {
     const interval = setInterval(() => {
-      const coords = editorRef.current?.getInteractiveCoords?.();
-      if (coords) {
-        setInteractiveCoords(coords);
+      // 🔧 添加空值检查，避免运行时错误
+      if (editorRef.current) {
+        const coords = editorRef.current.getInteractiveCoords();
+        if (coords) {
+          setInteractiveCoords(coords);
+        }
+        
+        const inputType = editorRef.current.getCurrentInputType();
+        setCurrentInputType(inputType);
       }
-    }, 100); // 每 100ms 拉一次
+    }, 100);
     return () => clearInterval(interval);
   }, []);
 
@@ -28,8 +29,8 @@ function App() {
     <div style={{ display: "flex", height: "100vh", width: "100vw" }}>
       <div style={{ flex: 1 }}>
         <ViewerPanel 
-          czml={czml}
           interactiveCoords={interactiveCoords}
+          currentInputType={currentInputType}
           onCoordinateSelected={(coord) => {
             editorRef.current?.handleCoordinateSelected(coord);
           }}
@@ -40,7 +41,8 @@ function App() {
         />
       </div>
       <div style={{ width: 400, borderLeft: "1px solid #ccc", backgroundColor: "#f8f8f8" }}>
-        <EditorPanel onUpdate={setCzml} ref={editorRef} />
+        {/* 🔧 保持 onUpdate 回调，但可以是空函数 */}
+        <EditorPanel onUpdate={() => {}} ref={editorRef} />
       </div>
     </div>
   );
