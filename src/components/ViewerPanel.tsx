@@ -142,6 +142,15 @@ const ViewerPanel = ({
       ref={(e) => {
         if (e?.cesiumElement) handleReady(e.cesiumElement);
       }}
+      timeline={false}
+      animation={false}
+      baseLayerPicker={false}
+      geocoder={false}
+      fullscreenButton={false}
+      homeButton={false}
+      sceneModePicker={false}
+      navigationHelpButton={false}
+      vrButton={false}
     >
       <CzmlDataSource data={czml} key={JSON.stringify(czml)} />
 
