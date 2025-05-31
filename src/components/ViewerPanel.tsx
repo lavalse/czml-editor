@@ -1,6 +1,9 @@
 import { Viewer, CzmlDataSource } from "resium";
 import { Ion, ScreenSpaceEventHandler, ScreenSpaceEventType, Cartesian2, Cartographic, Math as CesiumMath, Viewer as CesiumViewer } from "cesium";
 import { useRef, useCallback } from "react";
+import { Entity, PolylineGraphics, PointGraphics } from "resium";
+import { Cartesian3, Color } from "cesium";
+
 
 const token = import.meta.env.VITE_CESIUM_TOKEN;
 Ion.defaultAccessToken = token;
@@ -10,9 +13,10 @@ interface Props {
   onCoordinateSelected?: (coords: { lon: number; lat: number; height: number }) => void;
   onEntityPicked?: (id: string) => void;
   onFinishCoordinateInput?: () => void;
+  interactiveCoords?: { lon: number; lat: number }[];
 }
 
-const ViewerPanel = ({ czml, onCoordinateSelected, onEntityPicked, onFinishCoordinateInput }: Props) => {
+const ViewerPanel = ({ czml, onCoordinateSelected, onEntityPicked, onFinishCoordinateInput,interactiveCoords }: Props) => {
   const viewerRef = useRef<CesiumViewer | null>(null);
 
   const handleReady = useCallback((viewer: CesiumViewer) => {
@@ -26,16 +30,14 @@ const ViewerPanel = ({ czml, onCoordinateSelected, onEntityPicked, onFinishCoord
     handler.setInputAction((event: { position: Cartesian2 }) => {
       const position = event.position;
 
-      // ✅ 尝试拾取实体
       const picked = viewer.scene.pick(position);
       if (picked?.id && typeof picked.id.id === "string") {
         const entityId = picked.id.id;
         console.log("📍 Picked entity:", entityId);
-        onEntityPicked?.(entityId); // 🔥 通知外部
+        onEntityPicked?.(entityId);
         return;
       }
 
-      // ✅ 若未点到实体，则尝试取地理坐标
       if (onCoordinateSelected) {
         const cartesian = viewer.camera.pickEllipsoid(position, viewer.scene.globe.ellipsoid);
         if (cartesian) {
@@ -50,7 +52,6 @@ const ViewerPanel = ({ czml, onCoordinateSelected, onEntityPicked, onFinishCoord
       }
     }, ScreenSpaceEventType.LEFT_CLICK);
 
-     // ✅ 新增：右键完成输入
     handler.setInputAction(() => {
       console.log("✅ Right-click: finish coordinate input");
       onFinishCoordinateInput?.();
@@ -63,13 +64,43 @@ const ViewerPanel = ({ czml, onCoordinateSelected, onEntityPicked, onFinishCoord
 
   return (
     <Viewer
-      style={{ width: "100%", height: "100%" }}
-      ref={(e) => {
-        if (e?.cesiumElement) handleReady(e.cesiumElement);
-      }}
-    >
-      <CzmlDataSource data={czml} key={JSON.stringify(czml)} />
-    </Viewer>
+  style={{ width: "100%", height: "100%" }}
+  ref={(e) => {
+    if (e?.cesiumElement) handleReady(e.cesiumElement);
+  }}
+>
+  <CzmlDataSource data={czml} key={JSON.stringify(czml)} />
+
+  {/* ✅ 临时交互点和线 */}
+  {interactiveCoords && interactiveCoords.length > 0 && (
+    <>
+      {/* 每个点显示为黄色小点 */}
+      {interactiveCoords.map((coord, i) => (
+        <Entity
+          key={`temp-point-${i}`}
+          position={Cartesian3.fromDegrees(coord.lon, coord.lat, 0)}
+        >
+          <PointGraphics pixelSize={8} color={Color.YELLOW} />
+        </Entity>
+      ))}
+
+      {/* 两个以上点才显示临时 polyline */}
+      {interactiveCoords.length >= 2 && (
+        <Entity>
+          <PolylineGraphics
+            positions={interactiveCoords.map(p =>
+              Cartesian3.fromDegrees(p.lon, p.lat, 0)
+            )}
+            width={2}
+            material={Color.YELLOW}
+            clampToGround={true}
+          />
+        </Entity>
+      )}
+    </>
+  )}
+</Viewer>
+
   );
 };
 

@@ -1,8 +1,7 @@
 import { forwardRef, useImperativeHandle, useRef } from "react";
-import CommandInput from "../components/CommandInput";
 import { useCommandRunner } from "../hooks/useCommandRunner";
 import CzmlEditor from "./CZMLEditor";
-
+import CommandInput from "../components/CommandInput";
 
 interface Props {
   onUpdate: (czml: Record<string, unknown>[]) => void;
@@ -12,6 +11,7 @@ export interface EditorPanelHandle {
   handleCoordinateSelected: (coord: { lon: number; lat: number; height: number }) => void;
   handleEntityPicked(id: string): void;
   finalizeCoordinatesStep(): void;
+  getInteractiveCoords: () => { lon: number; lat: number }[];
 }
 
 const EditorPanel = forwardRef<EditorPanelHandle, Props>(({ onUpdate }, ref) => {
@@ -27,6 +27,7 @@ const EditorPanel = forwardRef<EditorPanelHandle, Props>(({ onUpdate }, ref) => 
     handleCoordinateSelected,
     finalizeCoordinatesStep,
     handleEntityPicked,
+    interactiveCoords,
     error,
   } = useCommandRunner({ onUpdate,inputRef });
 
@@ -34,6 +35,7 @@ const EditorPanel = forwardRef<EditorPanelHandle, Props>(({ onUpdate }, ref) => 
     handleCoordinateSelected,
     handleEntityPicked,
     finalizeCoordinatesStep,
+    getInteractiveCoords: () => interactiveCoords,
   }));
 
   return (

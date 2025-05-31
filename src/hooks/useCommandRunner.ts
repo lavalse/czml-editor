@@ -43,6 +43,7 @@ export const useCommandRunner = ({ onUpdate, initialText, inputRef }: Options) =
     onUpdate(newCzml);
 
     setCurrentCommandName(null);
+    setInteractiveCoords([]);
     setInteractiveStepIndex(0);
     setInteractiveParams({});
     setPrompt("请输入命令:");
@@ -109,6 +110,7 @@ export const useCommandRunner = ({ onUpdate, initialText, inputRef }: Options) =
       // 单点交互：设置为字符串坐标
       const coordStr = `${lon.toFixed(6)},${lat.toFixed(6)}`;
       setCommandInput(coordStr);
+      setInteractiveCoords([{ lon, lat }]);
     }
   };
 
@@ -135,6 +137,7 @@ export const useCommandRunner = ({ onUpdate, initialText, inputRef }: Options) =
     setCommandInput,
     handleCommand,
     handleCoordinateSelected,
+    interactiveCoords,
     finalizeCoordinatesStep,
     handleEntityPicked,
     error
