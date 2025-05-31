@@ -12,6 +12,31 @@ interface Options {
   inputRef?: React.RefObject<HTMLInputElement | null>;
 }
 
+// 🔧 更健壮的focus工具函数，带重试机制
+const focusCommandInput = (delay = 100, maxRetries = 3) => {
+  let retryCount = 0;
+  
+  const tryFocus = () => {
+    const input = document.querySelector('input[data-command-input="true"]') as HTMLInputElement;
+    if (input) {
+      input.focus();
+      console.log("🎯 Hook聚焦输入框成功");
+      return true;
+    } else {
+      retryCount++;
+      if (retryCount < maxRetries) {
+        console.log(`🔄 Hook重试聚焦 (${retryCount}/${maxRetries})`);
+        setTimeout(tryFocus, 50); // 短间隔重试
+      } else {
+        console.warn("⚠️ Hook聚焦失败：未找到命令输入框");
+      }
+      return false;
+    }
+  };
+  
+  setTimeout(tryFocus, delay);
+};
+
 export const useCommandRunner = ({ onUpdate, inputRef }: Options) => {
   // CZML Store
   const czml = useCzmlStore((state) => state.czml);
@@ -55,13 +80,9 @@ export const useCommandRunner = ({ onUpdate, inputRef }: Options) => {
     setCzml(newCzml);
     resetCommand();
     
-    // 聚焦输入框
-    setTimeout(() => {
-      if (inputRef?.current) {
-        inputRef.current.focus();
-      }
-    }, 100);
-  }, [czml, setCzml, resetCommand, inputRef]);
+    // 🔧 使用统一的focus函数
+    focusCommandInput(150);
+  }, [czml, setCzml, resetCommand]);
 
   // 🔧 简化的命令处理逻辑
   const handleCommand = useCallback((input: string) => {
@@ -81,6 +102,8 @@ export const useCommandRunner = ({ onUpdate, inputRef }: Options) => {
         const interactive = getInteractiveCommand(input);
         if (interactive) {
           startInteractiveCommand(input);
+          // 🔧 开始交互命令后聚焦
+          focusCommandInput(100);
           return;
         }
 
@@ -94,6 +117,9 @@ export const useCommandRunner = ({ onUpdate, inputRef }: Options) => {
       const hasNextStep = nextStep(input);
       if (!hasNextStep) {
         completeCommand();
+      } else {
+        // 🔧 进入下一步后聚焦
+        focusCommandInput(100);
       }
     } catch (err) {
       setError("命令执行出错: " + (err instanceof Error ? err.message : String(err)));

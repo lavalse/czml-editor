@@ -9,6 +9,31 @@ import { useCzmlStore } from "../stores/useCzmlStore";
 const token = import.meta.env.VITE_CESIUM_TOKEN;
 Ion.defaultAccessToken = token;
 
+// 🔧 ViewerPanel专用的focus函数，带重试机制
+const focusCommandInputFromViewer = (context: string, delay = 100, maxRetries = 3) => {
+  let retryCount = 0;
+  
+  const tryFocus = () => {
+    const input = document.querySelector('input[data-command-input="true"]') as HTMLInputElement;
+    if (input) {
+      input.focus();
+      console.log(`🎯 ViewerPanel聚焦成功 (${context})`);
+      return true;
+    } else {
+      retryCount++;
+      if (retryCount < maxRetries) {
+        console.log(`🔄 ViewerPanel重试聚焦 (${retryCount}/${maxRetries}) - ${context}`);
+        setTimeout(tryFocus, 50);
+      } else {
+        console.warn(`⚠️ ViewerPanel聚焦失败 - ${context}`);
+      }
+      return false;
+    }
+  };
+  
+  setTimeout(tryFocus, delay);
+};
+
 interface Props {
   onCoordinateSelected?: (coords: { lon: number; lat: number; height: number }) => void;
   onEntityPicked?: (id: string) => void;
@@ -52,11 +77,9 @@ const ViewerPanel = ({
         console.log("📍 选中实体:", entityId);
         onEntityPicked?.(entityId);
         
+        // 🔧 实体选择后立即聚焦输入框
         if (currentInputType === "entityId") {
-          setTimeout(() => {
-            const input = document.querySelector('input[data-command-input="true"]') as HTMLInputElement;
-            if (input) input.focus();
-          }, 100);
+          focusCommandInputFromViewer("实体选择", 100);
         }
         return; // 重要：选中实体后直接返回，不处理坐标
       }
@@ -73,11 +96,9 @@ const ViewerPanel = ({
           console.log("👆 地图点击坐标:", { lon, lat, height });
           onCoordinateSelected({ lon, lat, height });
           
+          // 🔧 对于单个坐标选择，立即聚焦输入框
           if (currentInputType === "coordinate") {
-            setTimeout(() => {
-              const input = document.querySelector('input[data-command-input="true"]') as HTMLInputElement;
-              if (input) input.focus();
-            }, 100);
+            focusCommandInputFromViewer("坐标选择", 100);
           }
         }
       }
@@ -87,10 +108,8 @@ const ViewerPanel = ({
       console.log("✅ 右键点击：完成坐标输入");
       onFinishCoordinateInput?.();
       
-      setTimeout(() => {
-        const input = document.querySelector('input[data-command-input="true"]') as HTMLInputElement;
-        if (input) input.focus();
-      }, 100);
+      // 🔧 右键完成坐标输入后聚焦
+      focusCommandInputFromViewer("右键完成", 100);
     }, ScreenSpaceEventType.RIGHT_CLICK);
 
   }, [onCoordinateSelected, onEntityPicked, onFinishCoordinateInput, currentInputType]);
@@ -123,14 +142,6 @@ const ViewerPanel = ({
       ref={(e) => {
         if (e?.cesiumElement) handleReady(e.cesiumElement);
       }}
-      timeline={false}
-      animation={false}
-      baseLayerPicker={false}
-      geocoder={false}
-      fullscreenButton={false}
-      homeButton={false}
-      sceneModePicker={false}
-      navigationHelpButton={false}
     >
       <CzmlDataSource data={czml} key={JSON.stringify(czml)} />
 
