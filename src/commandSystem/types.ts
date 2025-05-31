@@ -26,7 +26,7 @@ export interface InteractiveCommandDef {
 export interface InteractiveStep {
   key: string;
   prompt: string;
-  transform?: (input: string) => unknown;
+  transform?: (input: string | { lon: number; lat: number } | { lon: number; lat: number }[]) => unknown;
   validate?: (input: string) => boolean;
-  inputType?: "coordinate" | "entityId" ;
+  inputType?: "coordinate" | "entityId" | "coordinates[]" ;
 }

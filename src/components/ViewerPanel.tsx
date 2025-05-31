@@ -9,9 +9,10 @@ interface Props {
   czml: Record<string, unknown>[];
   onCoordinateSelected?: (coords: { lon: number; lat: number; height: number }) => void;
   onEntityPicked?: (id: string) => void;
+  onFinishCoordinateInput?: () => void;
 }
 
-const ViewerPanel = ({ czml, onCoordinateSelected, onEntityPicked}: Props) => {
+const ViewerPanel = ({ czml, onCoordinateSelected, onEntityPicked, onFinishCoordinateInput }: Props) => {
   const viewerRef = useRef<CesiumViewer | null>(null);
 
   const handleReady = useCallback((viewer: CesiumViewer) => {
@@ -49,10 +50,16 @@ const ViewerPanel = ({ czml, onCoordinateSelected, onEntityPicked}: Props) => {
       }
     }, ScreenSpaceEventType.LEFT_CLICK);
 
+     // ✅ 新增：右键完成输入
+    handler.setInputAction(() => {
+      console.log("✅ Right-click: finish coordinate input");
+      onFinishCoordinateInput?.();
+    }, ScreenSpaceEventType.RIGHT_CLICK);
+
     return () => {
       handler.destroy();
     };
-  }, [onCoordinateSelected, onEntityPicked]);
+  }, [onCoordinateSelected, onEntityPicked, onFinishCoordinateInput]);
 
   return (
     <Viewer

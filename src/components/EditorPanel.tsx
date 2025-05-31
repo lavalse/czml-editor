@@ -11,6 +11,7 @@ interface Props {
 export interface EditorPanelHandle {
   handleCoordinateSelected: (coord: { lon: number; lat: number; height: number }) => void;
   handleEntityPicked(id: string): void;
+  finalizeCoordinatesStep(): void;
 }
 
 const EditorPanel = forwardRef<EditorPanelHandle, Props>(({ onUpdate }, ref) => {
@@ -24,20 +25,16 @@ const EditorPanel = forwardRef<EditorPanelHandle, Props>(({ onUpdate }, ref) => 
     setCommandInput,
     handleCommand,
     handleCoordinateSelected,
+    finalizeCoordinatesStep,
     handleEntityPicked,
     error,
-  } = useCommandRunner({ onUpdate });
+  } = useCommandRunner({ onUpdate,inputRef });
 
   useImperativeHandle(ref, () => ({
-  handleCoordinateSelected: (coord) => {
-    handleCoordinateSelected(coord);
-    inputRef.current?.focus();
-  },
-  handleEntityPicked: (id) => {
-    handleEntityPicked(id);
-    inputRef.current?.focus();
-  }
-}));
+    handleCoordinateSelected,
+    handleEntityPicked,
+    finalizeCoordinatesStep,
+  }));
 
   return (
     <div style={{ padding: "16px", height: "100%", boxSizing: "border-box" }}>

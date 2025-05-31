@@ -7,9 +7,10 @@ import { safeParseCzml } from "../utils/json";
 interface Options {
   onUpdate: (czml: Record<string, unknown>[]) => void;
   initialText?: string;
+  inputRef?: React.RefObject<HTMLInputElement | null>;
 }
 
-export const useCommandRunner = ({ onUpdate, initialText }: Options) => {
+export const useCommandRunner = ({ onUpdate, initialText, inputRef }: Options) => {
   const [czmlText, setCzmlText] = useState<string>(
     initialText ??
       `[{
@@ -24,6 +25,8 @@ export const useCommandRunner = ({ onUpdate, initialText }: Options) => {
   const [interactiveParams, setInteractiveParams] = useState<Record<string, unknown>>({});
   const [prompt, setPrompt] = useState("请输入命令:");
   const [commandInput, setCommandInput] = useState("");
+  const [interactiveCoords, setInteractiveCoords] = useState<{ lon: number; lat: number }[]>([]);
+
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -57,6 +60,7 @@ export const useCommandRunner = ({ onUpdate, initialText }: Options) => {
           setInteractiveStepIndex(0);
           setInteractiveParams({});
           setPrompt(interactive.steps[0].prompt);
+          setInteractiveCoords([]);
           return;
         }
 
@@ -98,14 +102,28 @@ export const useCommandRunner = ({ onUpdate, initialText }: Options) => {
 
 
   const handleCoordinateSelected = ({ lon, lat }: { lon: number; lat: number }) => {
-    if (!isCurrentStepInputType("coordinate")) return;
-    const coordStr = `${lon.toFixed(6)},${lat.toFixed(6)}`;
-    setCommandInput(coordStr);
+    if (isCurrentStepInputType("coordinates[]")) {
+      // 如果是多点交互，追加当前坐标
+      setInteractiveCoords(prev => [...prev, { lon, lat }]);
+    } else if (isCurrentStepInputType("coordinate")) {
+      // 单点交互：设置为字符串坐标
+      const coordStr = `${lon.toFixed(6)},${lat.toFixed(6)}`;
+      setCommandInput(coordStr);
+    }
   };
 
   const handleEntityPicked = (id: string) => {
     if (!isCurrentStepInputType("entityId")) return;
     setCommandInput(id);
+  };
+
+  const finalizeCoordinatesStep = () => {
+    if (!isCurrentStepInputType("coordinates[]")) return;
+
+    // 格式化为字符串，例如 "139.7,35.6 139.8,35.7"
+    const coordStr = interactiveCoords.map(p => `${p.lon.toFixed(6)},${p.lat.toFixed(6)}`).join(" ");
+    setCommandInput(coordStr);
+    inputRef?.current?.focus();
   };
 
 
@@ -117,6 +135,7 @@ export const useCommandRunner = ({ onUpdate, initialText }: Options) => {
     setCommandInput,
     handleCommand,
     handleCoordinateSelected,
+    finalizeCoordinatesStep,
     handleEntityPicked,
     error
   };
