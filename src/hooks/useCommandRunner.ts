@@ -1,8 +1,10 @@
+// hooks/useCommandRunner.ts
 import { useState, useEffect, useCallback } from "react";
 import { handleCommandInput, getInteractiveCommand } from "../commandSystem/registry";
 import { registerBuiltinCommands } from "../commandSystem/registerBuiltins";
 import type { CzmlEntity } from "../commandSystem/types";
 import { safeParseCzml } from "../utils/json";
+import { useCzmlStore } from "../stores/useCZMLStore";
 
 interface Options {
   onUpdate: (czml: Record<string, unknown>[]) => void;
@@ -11,36 +13,55 @@ interface Options {
 }
 
 export const useCommandRunner = ({ onUpdate, initialText, inputRef }: Options) => {
-  const [czmlText, setCzmlText] = useState<string>(
-    initialText ??
-      `[{
-        "id": "document",
-        "name": "CZML Path",
-        "version": "1.0"
-      }]`
-  );
+  // 🔧 修复：分别获取数据和方法，避免无限循环
+  const czml = useCzmlStore((state) => state.czml);
+  const czmlText = useCzmlStore((state) => state.czmlText);
+  const setCzml = useCzmlStore((state) => state.setCzml);
+  const setCzmlText = useCzmlStore((state) => state.setCzmlText);
 
+  // 其他状态保持不变
   const [currentCommandName, setCurrentCommandName] = useState<string | null>(null);
   const [interactiveStepIndex, setInteractiveStepIndex] = useState(0);
   const [interactiveParams, setInteractiveParams] = useState<Record<string, unknown>>({});
   const [prompt, setPrompt] = useState("请输入命令:");
   const [commandInput, setCommandInput] = useState("");
   const [interactiveCoords, setInteractiveCoords] = useState<{ lon: number; lat: number }[]>([]);
-
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     registerBuiltinCommands();
   }, []);
 
+  // 🔧 修复：使用 useEffect 但添加依赖控制，避免无限循环
+  useEffect(() => {
+    onUpdate(czml);
+  }, [czml]); // 移除 onUpdate 依赖，因为它可能每次都变
+
+  const getCurrentInputType = useCallback(() => {
+    if (!currentCommandName) return null;
+    const command = getInteractiveCommand(currentCommandName);
+    if (!command) return null;
+    const step = command.steps[interactiveStepIndex];
+    return step?.inputType || null;
+  }, [currentCommandName, interactiveStepIndex]);
+
+  const maintainInputFocus = useCallback(() => {
+    const currentInputType = getCurrentInputType();
+    if (currentInputType === "coordinate" || currentInputType === "entityId") {
+      setTimeout(() => {
+        if (inputRef?.current) {
+          inputRef.current.focus();
+        }
+      }, 100);
+    }
+  }, [getCurrentInputType, inputRef]);
+
   const completeCommand = useCallback((params: Record<string, unknown>) => {
-    const czml = safeParseCzml(czmlText) as CzmlEntity[];
     const command = getInteractiveCommand(currentCommandName!);
     if (!command) return;
+    
     const newCzml = command.onComplete(params, czml);
-    const newText = JSON.stringify(newCzml, null, 2);
-    setCzmlText(newText);
-    onUpdate(newCzml);
+    setCzml(newCzml); // 🔧 这里只调用一次，不会造成循环
 
     setCurrentCommandName(null);
     setInteractiveCoords([]);
@@ -48,11 +69,17 @@ export const useCommandRunner = ({ onUpdate, initialText, inputRef }: Options) =
     setInteractiveParams({});
     setPrompt("请输入命令:");
     setCommandInput("");
-  }, [czmlText, currentCommandName, onUpdate]);
+    
+    setTimeout(() => {
+      if (inputRef?.current) {
+        inputRef.current.focus();
+      }
+    }, 100);
+  }, [currentCommandName, czml, setCzml, inputRef]);
 
-  const handleCommand = (input: string) => {
+  const handleCommand = useCallback((input: string) => {
     try {
-      const czml = safeParseCzml(czmlText) as CzmlEntity[];
+      const parsedCzml = safeParseCzml(czmlText) as CzmlEntity[];
 
       if (!currentCommandName) {
         const interactive = getInteractiveCommand(input);
@@ -65,10 +92,8 @@ export const useCommandRunner = ({ onUpdate, initialText, inputRef }: Options) =
           return;
         }
 
-        const newCzml = handleCommandInput(input, czml);
-        const newText = JSON.stringify(newCzml, null, 2);
-        setCzmlText(newText);
-        onUpdate(newCzml);
+        const newCzml = handleCommandInput(input, parsedCzml);
+        setCzml(newCzml); // 🔧 这里只调用一次
         return;
       }
 
@@ -89,45 +114,46 @@ export const useCommandRunner = ({ onUpdate, initialText, inputRef }: Options) =
     } catch {
       setError("当前 CZML 内容格式不正确，无法执行命令");
     }
-  };
+  }, [czmlText, currentCommandName, interactiveStepIndex, interactiveParams, setCzml, completeCommand]);
 
-  const getCurrentStep = () => {
+  const getCurrentStep = useCallback(() => {
     const command = getInteractiveCommand(currentCommandName!);
     return command?.steps[interactiveStepIndex] ?? null;
-  };
+  }, [currentCommandName, interactiveStepIndex]);
 
-  const isCurrentStepInputType = (type: string) => {
+  const isCurrentStepInputType = useCallback((type: string) => {
     const step = getCurrentStep();
     return step?.inputType === type;
-  };
+  }, [getCurrentStep]);
 
-
-  const handleCoordinateSelected = ({ lon, lat }: { lon: number; lat: number }) => {
+  const handleCoordinateSelected = useCallback(({ lon, lat }: { lon: number; lat: number }) => {
     if (isCurrentStepInputType("coordinates[]")) {
-      // 如果是多点交互，追加当前坐标
       setInteractiveCoords(prev => [...prev, { lon, lat }]);
     } else if (isCurrentStepInputType("coordinate")) {
-      // 单点交互：设置为字符串坐标
       const coordStr = `${lon.toFixed(6)},${lat.toFixed(6)}`;
       setCommandInput(coordStr);
       setInteractiveCoords([{ lon, lat }]);
+      maintainInputFocus();
     }
-  };
+  }, [isCurrentStepInputType, maintainInputFocus]);
 
-  const handleEntityPicked = (id: string) => {
+  const handleEntityPicked = useCallback((id: string) => {
     if (!isCurrentStepInputType("entityId")) return;
     setCommandInput(id);
-  };
+    maintainInputFocus();
+  }, [isCurrentStepInputType, maintainInputFocus]);
 
-  const finalizeCoordinatesStep = () => {
+  const finalizeCoordinatesStep = useCallback(() => {
     if (!isCurrentStepInputType("coordinates[]")) return;
 
-    // 格式化为字符串，例如 "139.7,35.6 139.8,35.7"
     const coordStr = interactiveCoords.map(p => `${p.lon.toFixed(6)},${p.lat.toFixed(6)}`).join(" ");
     setCommandInput(coordStr);
-    inputRef?.current?.focus();
-  };
-
+    setTimeout(() => {
+      if (inputRef?.current) {
+        inputRef.current.focus();
+      }
+    }, 100);
+  }, [isCurrentStepInputType, interactiveCoords, inputRef]);
 
   return {
     czmlText,
@@ -140,6 +166,7 @@ export const useCommandRunner = ({ onUpdate, initialText, inputRef }: Options) =
     interactiveCoords,
     finalizeCoordinatesStep,
     handleEntityPicked,
-    error
+    error,
+    currentInputType: getCurrentInputType()
   };
 };
