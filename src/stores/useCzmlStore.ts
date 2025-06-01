@@ -1,3 +1,4 @@
+// src/stores/useCzmlStore.ts
 import { create } from 'zustand';
 
 interface CzmlEntity {
@@ -13,6 +14,7 @@ interface CzmlStore {
   setCzmlText: (text: string) => void;
   addEntity: (entity: CzmlEntity) => void;
   removeEntity: (entityId: string) => void;
+  updateFromText: (text: string) => boolean; // 新增方法
 }
 
 export const useCzmlStore = create<CzmlStore>((set, get) => ({
@@ -22,10 +24,10 @@ export const useCzmlStore = create<CzmlStore>((set, get) => ({
     version: "1.0"
   }],
   czmlText: `[{
-    "id": "document",
-    "name": "CZML Path",
-    "version": "1.0"
-  }]`,
+  "id": "document",
+  "name": "CZML Path",
+  "version": "1.0"
+}]`,
 
   setCzml: (newCzml) => set({ 
     czml: newCzml,
@@ -48,5 +50,24 @@ export const useCzmlStore = create<CzmlStore>((set, get) => ({
       czml: newCzml,
       czmlText: JSON.stringify(newCzml, null, 2)
     };
-  })
+  }),
+
+  // 从文本更新 CZML，返回是否成功
+  updateFromText: (text) => {
+    try {
+      const parsed = JSON.parse(text);
+      if (!Array.isArray(parsed)) {
+        return false;
+      }
+      
+      // 保持文本的原始格式（用户的缩进和换行）
+      set({
+        czml: parsed,
+        czmlText: text
+      });
+      return true;
+    } catch {
+      return false;
+    }
+  }
 }));

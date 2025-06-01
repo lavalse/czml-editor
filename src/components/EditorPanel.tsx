@@ -1,7 +1,7 @@
 // src/components/EditorPanel.tsx
 import { useRef } from "react";
 import { useCommandRunner } from "../hooks/useCommandRunner";
-import CzmlEditor from "./CZMLEditor";
+import CzmlEditor from "./CzmlEditor";
 import CommandInput from "../components/CommandInput";
 import { useCommandStore } from "../stores/useCommandStore";
 
@@ -36,7 +36,6 @@ const EditorPanel = ({ onUpdate }: Props) => {
         flexDirection: "column"
       }}
     >
-      <h3 style={{ margin: "0 0 16px 0", fontSize: "18px" }}>命令终端</h3>
       
       <div style={{ 
         marginBottom: "16px",
@@ -73,7 +72,6 @@ const EditorPanel = ({ onUpdate }: Props) => {
       )}
       
       <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
-        <h4 style={{ margin: "0 0 8px 0", fontSize: "16px" }}>CZML 编辑器</h4>
         <CzmlEditor value={czmlText} onChange={setCzmlText} />
       </div>
     </div>

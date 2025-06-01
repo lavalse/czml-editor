@@ -141,17 +141,23 @@ const CommandInput = ({ prompt, value, onChange, onEnter, inputRef, commandHisto
     inputRef
   ]);
 
+  // 根据 prompt 生成更友好的 placeholder
+  const getPlaceholder = () => {
+    // 如果是默认提示，显示通用的命令提示
+    if (prompt === "请输入命令:") {
+      return "输入命令";
+    }
+    // 否则直接使用 prompt 作为 placeholder
+    return prompt.replace(/[:：]$/, '...'); // 移除末尾的冒号并添加省略号
+  };
+
   return (
-    <>
+    <div style={{ width: "100%" }}>
       <div style={{ 
-        marginBottom: "8px", 
-        fontFamily: "monospace", 
-        fontSize: "14px",
-        color: "#666"
+        position: "relative", 
+        marginBottom: "12px",
+        width: "100%"
       }}>
-        {prompt}
-      </div>
-      <div style={{ position: "relative", marginBottom: "12px" }}>
         <input
           ref={inputRef}
           data-command-input="true"
@@ -160,10 +166,10 @@ const CommandInput = ({ prompt, value, onChange, onEnter, inputRef, commandHisto
             onChange(e.target.value);
             setHistoryIndex(-1); // 用户输入时重置历史索引
           }}
-          placeholder="输入命令..."
+          placeholder={getPlaceholder()}
           style={{
             width: "100%",
-            padding: "10px 12px",
+            padding: "10px 40px 10px 12px", // 右侧留出空间给历史索引
             fontFamily: "monospace",
             fontSize: "14px",
             background: "#1a1a1a",
@@ -172,6 +178,7 @@ const CommandInput = ({ prompt, value, onChange, onEnter, inputRef, commandHisto
             borderRadius: "4px",
             outline: "none",
             transition: "border-color 0.2s",
+            boxSizing: "border-box", // 确保 padding 包含在宽度内
           }}
           onFocus={(e) => {
             e.target.style.borderColor = "#555";
@@ -183,7 +190,7 @@ const CommandInput = ({ prompt, value, onChange, onEnter, inputRef, commandHisto
         {historyIndex > -1 && (
           <div style={{
             position: "absolute",
-            right: "8px",
+            right: "12px",
             top: "50%",
             transform: "translateY(-50%)",
             fontSize: "11px",
@@ -198,11 +205,11 @@ const CommandInput = ({ prompt, value, onChange, onEnter, inputRef, commandHisto
         fontSize: "12px",
         color: "#555",
         fontFamily: "monospace",
-        marginBottom: "8px"
+        textAlign: "center"
       }}>
-        提示: ↑/↓ 浏览历史 | Enter 执行 | Esc 清空 | Ctrl+K 聚焦
+        ↑/↓ 浏览历史 | Enter 执行 | Esc 清空 | Ctrl+K 聚焦
       </div>
-    </>
+    </div>
   );
 };
 
