@@ -15,10 +15,18 @@ interface CommandStore {
   interactiveCoords: { lon: number; lat: number }[];
   error: string | null;
   
+  // 命令历史
+  commandHistory: string[];
+  maxHistorySize: number;
+  
   // Actions
   setCommandInput: (input: string) => void;
   setError: (error: string | null) => void;
   clearError: () => void;
+  
+  // 历史记录管理
+  addToHistory: (command: string) => void;
+  clearHistory: () => void;
   
   // 命令流程控制
   startInteractiveCommand: (commandName: string) => void;
@@ -30,6 +38,25 @@ interface CommandStore {
   clearInteractiveCoords: () => void;
 }
 
+// 从 localStorage 加载历史记录
+const loadHistory = (): string[] => {
+  try {
+    const saved = localStorage.getItem('commandHistory');
+    return saved ? JSON.parse(saved) : [];
+  } catch {
+    return [];
+  }
+};
+
+// 保存历史记录到 localStorage
+const saveHistory = (history: string[]) => {
+  try {
+    localStorage.setItem('commandHistory', JSON.stringify(history));
+  } catch (e) {
+    console.warn('Failed to save command history:', e);
+  }
+};
+
 export const useCommandStore = create<CommandStore>((set, get) => ({
   // 初始状态
   currentCommandName: null,
@@ -39,6 +66,10 @@ export const useCommandStore = create<CommandStore>((set, get) => ({
   commandInput: "",
   interactiveCoords: [],
   error: null,
+  
+  // 历史记录
+  commandHistory: loadHistory(),
+  maxHistorySize: 50,
 
   // 基础 Actions
   setCommandInput: (commandInput) => set({ commandInput }),
@@ -47,6 +78,36 @@ export const useCommandStore = create<CommandStore>((set, get) => ({
   
   clearError: () => set({ error: null }),
 
+  // 添加到历史记录
+  addToHistory: (command) => {
+    const trimmedCommand = command.trim();
+    if (!trimmedCommand) return;
+    
+    set((state) => {
+      // 移除重复的命令
+      const filteredHistory = state.commandHistory.filter(cmd => cmd !== trimmedCommand);
+      
+      // 添加到末尾
+      const newHistory = [...filteredHistory, trimmedCommand];
+      
+      // 限制历史记录大小
+      if (newHistory.length > state.maxHistorySize) {
+        newHistory.splice(0, newHistory.length - state.maxHistorySize);
+      }
+      
+      // 保存到 localStorage
+      saveHistory(newHistory);
+      
+      return { commandHistory: newHistory };
+    });
+  },
+
+  // 清空历史记录
+  clearHistory: () => {
+    localStorage.removeItem('commandHistory');
+    set({ commandHistory: [] });
+  },
+
   // 开始交互式命令
   startInteractiveCommand: (commandName) => {
     const command = getInteractiveCommand(commandName);
@@ -54,6 +115,9 @@ export const useCommandStore = create<CommandStore>((set, get) => ({
       set({ error: `未找到命令: ${commandName}` });
       return;
     }
+
+    // 添加到历史记录
+    get().addToHistory(commandName);
 
     set({
       currentCommandName: commandName,
