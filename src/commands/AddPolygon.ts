@@ -126,30 +126,7 @@ const AddPolygon: CommandDef = {
           return true;
         }
       },
-      {
-        key: "fillColor",
-        prompt: "请输入填充颜色 (R,G,B,A) 或按回车使用默认黄色：",
-        transform: (input) => {
-          if (typeof input === "string") {
-            const trimmed = input.trim();
-            if (!trimmed) {
-              return [255, 255, 0, 128]; // 默认半透明黄色
-            }
-            
-            const parts = trimmed.split(",").map(Number);
-            if (parts.length === 4 && parts.every(n => !isNaN(n) && n >= 0 && n <= 255)) {
-              return parts;
-            }
-            
-            // 如果只提供 RGB，默认 alpha 为 128
-            if (parts.length === 3 && parts.every(n => !isNaN(n) && n >= 0 && n <= 255)) {
-              return [...parts, 128];
-            }
-          }
-          
-          return [255, 255, 0, 128]; // 默认值
-        }
-      },
+
       {
         key: "extrudedHeight",
         prompt: "请输入拉伸高度（可选，0为不拉伸）：",
@@ -166,13 +143,14 @@ const AddPolygon: CommandDef = {
     onComplete(params, czml) {
       const { 
         coords, 
-        fillColor = [255, 255, 0, 128],
         extrudedHeight = 0 
       } = params as {
         coords: number[];
-        fillColor?: number[];
         extrudedHeight?: number;
       };
+
+      // 使用默认的半透明黄色
+      const fillColor = [255, 255, 0, 128];
 
       const newEntity: CzmlEntity = {
         id: `polygon-${Date.now()}`,
