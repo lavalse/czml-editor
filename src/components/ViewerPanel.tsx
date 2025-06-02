@@ -43,8 +43,64 @@ const ViewerPanel = ({
     if (!viewerRef.current) return;
 
     const unsubscribers: (() => void)[] = [];
+    
+    // 添加拖拽状态跟踪
+    let mouseDownPosition: { x: number; y: number } | null = null;
+    let isDragging = false;
+    const DRAG_THRESHOLD = 5; // 像素阈值，移动超过此距离视为拖拽
 
-    // 左键点击 - 选择实体或坐标
+    // 鼠标按下 - 记录初始位置
+    unsubscribers.push(
+      registerMouseBinding({
+        type: 'mousedown',
+        button: MOUSE_BUTTON.LEFT,
+        target: '.cesium-widget',
+        description: '记录鼠标按下位置',
+        action: (event) => {
+          mouseDownPosition = { x: event.clientX, y: event.clientY };
+          isDragging = false;
+        }
+      })
+    );
+
+    // 鼠标移动 - 检测是否在拖拽
+    unsubscribers.push(
+      registerMouseBinding({
+        type: 'mousemove',
+        target: '.cesium-widget',
+        description: '检测拖拽',
+        action: (event) => {
+          if (mouseDownPosition) {
+            const dx = event.clientX - mouseDownPosition.x;
+            const dy = event.clientY - mouseDownPosition.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            
+            if (distance > DRAG_THRESHOLD) {
+              isDragging = true;
+            }
+          }
+        }
+      })
+    );
+
+    // 鼠标释放 - 清理状态
+    unsubscribers.push(
+      registerMouseBinding({
+        type: 'mouseup',
+        button: MOUSE_BUTTON.LEFT,
+        target: '.cesium-widget',
+        description: '清理拖拽状态',
+        action: () => {
+          // 延迟清理，确保 click 事件能读取到状态
+          setTimeout(() => {
+            mouseDownPosition = null;
+            isDragging = false;
+          }, 10);
+        }
+      })
+    );
+
+    // 左键点击 - 选择实体或坐标（非拖拽时）
     unsubscribers.push(
       registerClickHandler({
         target: '.cesium-widget',
@@ -52,25 +108,17 @@ const ViewerPanel = ({
         context: 'viewer-select',
         onClick: (event) => {
           if (!viewerRef.current) return;
+          
+          // 如果是拖拽操作，不处理点击
+          if (isDragging) {
+            console.log("🖱️ 拖拽操作，忽略点击");
+            return;
+          }
 
           const viewer = viewerRef.current;
           const position = new Cartesian2(event.clientX, event.clientY);
           
-          // 检查是否点击了实体
-          const picked = viewer.scene.pick(position);
-          if (picked?.id && typeof picked.id.id === "string") {
-            const entityId = picked.id.id;
-            console.log("📍 选中实体:", entityId);
-            onEntityPicked?.(entityId);
-            
-            // 实体选择后聚焦输入框
-            if (currentInputType === "entityId") {
-              focusCommandInput();
-            }
-            return;
-          }
-
-          // 处理坐标选择
+          // 优先处理坐标选择（当正在输入坐标时）
           if (onCoordinateSelected && (currentInputType === "coordinate" || currentInputType === "coordinates[]")) {
             const cartesian = viewer.camera.pickEllipsoid(position, viewer.scene.globe.ellipsoid);
             if (cartesian) {
@@ -86,6 +134,18 @@ const ViewerPanel = ({
               if (currentInputType === "coordinate") {
                 focusCommandInput();
               }
+            }
+            return; // 坐标输入模式下，不再检查实体
+          }
+          
+          // 只有在需要选择实体时才检查实体
+          if (currentInputType === "entityId") {
+            const picked = viewer.scene.pick(position);
+            if (picked?.id && typeof picked.id.id === "string") {
+              const entityId = picked.id.id;
+              console.log("📍 选中实体:", entityId);
+              onEntityPicked?.(entityId);
+              focusCommandInput();
             }
           }
         },
